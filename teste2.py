@@ -14,26 +14,30 @@ st.set_page_config(page_title="SolarSim | Simulador Solar", page_icon="☀️", 
 
 # --- LOCALE (com fallback) ---
 try:
+    # Tenta configurar o locale para Português do Brasil
     locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 except:
+    # Se falhar (comum em servidores/deploy), usa o fallback
     pass
 
 
 def formatar_reais(valor: float) -> str:
     """Formata um float para o padrão R$ X.XXX,XX com fallback."""
     try:
+        # Tenta usar o locale pt_BR
         return locale.currency(valor, grouping=True)
     except:
+        # Fallback manual caso o locale falhe
         return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 # --- BASES DE DADOS (DICIONÁRIOS) ---
-# --- MUDANÇA: Foco exclusivo em Rio das Ostras ---
+# Foco exclusivo em Rio das Ostras com média de HSP correta
 HSP_CAPITAIS = {
     "Rio das Ostras (RJ)": 4.98
 }
 
-# --- MUDANÇA: Foco exclusivo em Rio das Ostras (usando média do RJ) ---
+# Foco exclusivo em Rio das Ostras (usando média do RJ)
 CUSTO_WP_CAPITAIS = {
     "Rio das Ostras (RJ)": 2.49
 }
@@ -192,7 +196,7 @@ with col1:
 
 with col2:
     st.subheader("3️⃣ Sua Localização")
-    # --- MUDANÇA: Selectbox desabilitado com opção única ---
+    # Selectbox desabilitado com opção única
     cidades_ordenadas = sorted(HSP_CAPITAIS.keys())
 
     cidade_selecionada = st.selectbox(
@@ -203,8 +207,20 @@ with col2:
         disabled=True  # Desabilita a caixa
     )
 
+    # --- NOVO BLOCO: TIPO DE CONEXÃO ---
+    st.markdown("---")  # Divisor
+    st.subheader("Tipo de Conexão (Enel)")
+    tipo_conexao = st.selectbox(
+        "Qual sua conexão com a rede?",
+        ("Bifásica (Taxa Mínima 50 kWh)",
+         "Monofásica (Taxa Mínima 30 kWh)",
+         "Trifásica (Taxa Mínima 100 kWh)"),
+        index=0,  # Padrão para Bifásica
+        key="tipo_conexao",
+        help="Isso define a taxa mínima (custo de disponibilidade) que você sempre pagará, mesmo gerando 100% da sua energia."
+    )
+
 # Cálculo temporário para estimativa de orçamento
-# A lógica de 'cidade_selecionada' é preservada
 hsp = HSP_CAPITAIS[cidade_selecionada]
 custo_wp = CUSTO_WP_CAPITAIS[cidade_selecionada]
 resultados_tmp = calcular_sistema_solar(consumo, tarifa, hsp, custo_wp)
@@ -242,10 +258,19 @@ if st.button("⚡ Simular meu sistema solar", type="primary", use_container_widt
         )
 
     tarifa_atual = st.session_state.tarifa
-    cidade_atual = st.session_state.cidade  # <- Isso funciona por causa do selectbox (mesmo desabilitado)
+    cidade_atual = st.session_state.cidade
     hsp_atual = HSP_CAPITAIS[cidade_atual]
     custo_wp_atual = CUSTO_WP_CAPITAIS[cidade_atual]
     escolha_atual = st.session_state.escolha_orc
+
+    # --- NOVO: Lógica da Taxa Mínima ---
+    conexao_atual = st.session_state.tipo_conexao
+    if "Monofásica" in conexao_atual:
+        minimo_kwh_atual = 30
+    elif "Trifásica" in conexao_atual:
+        minimo_kwh_atual = 100
+    else:
+        minimo_kwh_atual = 50  # Padrão Bifásica
 
     # Lógica principal: calcula por consumo ou por orçamento?
     if escolha_atual == 'Inserir meu Orçamento Personalizado':
@@ -261,6 +286,9 @@ if st.button("⚡ Simular meu sistema solar", type="primary", use_container_widt
 
     payback_final_str = formatar_payback(custo_final_atual, dados_finais["economia_mensal_reais"])
 
+    # --- NOVO: Cálculo de Saldo e Créditos ---
+    saldo_kwh_final = dados_finais["geracao_mensal"] - consumo_atual
+
     # Salva TUDO no session_state para persistir os resultados
     st.session_state.res = {
         "cidade": cidade_atual,
@@ -270,6 +298,8 @@ if st.button("⚡ Simular meu sistema solar", type="primary", use_container_widt
         "custo_final": custo_final_atual,
         "dados": dados_finais,
         "payback": payback_final_str,
+        "minimo_kwh": minimo_kwh_atual,  # Salva a taxa mínima
+        "saldo_kwh": saldo_kwh_final  # Salva o saldo
     }
 
 # 4) Mostrar resultados (se houver dados na sessão)
@@ -288,7 +318,7 @@ if "res" in st.session_state:
         for item, valor in dados["custos_detalhados"].items():
             st.text(f"- {item}: {formatar_reais(valor)}")
 
-    # Coluna 2: Detalhes do Sistema (com Inversor)
+    # Coluna 2: Detalhes do Sistema
     with c2:
         st.metric("Potência do Sistema (Painéis)", f"{dados['potencia_kwp']} kWp")
         st.metric(
@@ -299,9 +329,29 @@ if "res" in st.session_state:
         st.metric("Quantidade de Painéis", f"{dados['numero_paineis']}")
         st.metric("Área Mínima Necessária", f"{dados['area_m2']} m²")
 
-    # Coluna 3: Retorno Financeiro
+    # Coluna 3: Nova Realidade Financeira (Créditos e Taxa Mínima)
     with c3:
-        st.metric("Economia Mensal Estimada", formatar_reais(dados["economia_mensal_reais"]))
+        saldo_kwh = R["saldo_kwh"]
+        minimo_kwh = R["minimo_kwh"]
+        tarifa = R["tarifa"]
+
+        if saldo_kwh < 0:
+            # Caso 1: Geração MENOR que o consumo (Under-budget)
+            consumo_rede_kwh = abs(saldo_kwh)
+            kwh_a_pagar = max(consumo_rede_kwh, minimo_kwh)
+            nova_fatura = kwh_a_pagar * tarifa
+
+            st.metric("Nova Fatura Mensal Estimada", formatar_reais(nova_fatura))
+            st.metric("Consumo restante da Rede", f"{consumo_rede_kwh:.0f} kWh / mês")
+
+        else:
+            # Caso 2: Geração MAIOR que o consumo (Over-budget)
+            creditos_kwh = saldo_kwh
+            nova_fatura = minimo_kwh * tarifa  # Pagará apenas a taxa mínima
+
+            st.metric("Nova Fatura (Taxa Mínima)", formatar_reais(nova_fatura))
+            st.metric("Créditos Gerados", f"{creditos_kwh:.0f} kWh / mês")
+
         st.metric("Retorno do Investimento (Payback)", R["payback"])
 
     # Bloco de Explicação do Inversor
@@ -330,10 +380,8 @@ if "res" in st.session_state:
     st.subheader("📈 Visualização dos Resultados")
     modo_grafico = st.radio("Escolha o tipo de gráfico:", ["Mensal", "Anual"], horizontal=True, key="modo_grafico")
 
-    # --- CORREÇÃO DO FATOR SAZONAL (BASEADO NOS DADOS DE RIO DAS OSTRAS) ---
-    # Agora com picos no verão (Jan/Fev) e vales no inverno (Jun/Jul)
+    # Fator Sazonal CORRIGIDO (Baseado nos dados de 4.98)
     meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-    # Valores: (HSP do Mês / Média 4.98)
     fator_sazonal_correto = [1.118, 1.223, 1.052, 1.014, 0.912, 0.890, 0.881, 1.014, 0.960, 0.984, 0.918, 1.042]
 
     geracao_mensal = [dados["geracao_mensal"] * f for f in fator_sazonal_correto]
@@ -360,9 +408,11 @@ if "res" in st.session_state:
             "Categoria": ["Consumo Anual", "Geração Solar Anual"],
             "Energia (kWh/ano)": [R["consumo"] * 12, sum(geracao_mensal)]
         })
+        # --- CORREÇÃO DO BUG DO GRÁFICO ANUAL ---
+        # Corrigido o `alt.Y` e o `tooltip` para usar o nome exato da coluna.
         grafico = alt.Chart(df_anual).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
             x="Categoria",
-            y=alt.Y("Energia (kWh/ano)", title="Energia Anual (kWh)"),  # <- Corrigido
+            y=alt.Y("Energia (kWh/ano)", title="Energia Anual (kWh)"),
             color=alt.Color("Categoria",
                             scale=alt.Scale(domain=["Consumo Anual", "Geração Solar Anual"], range=range_)),
             tooltip=["Categoria", "Energia (kWh/ano)"]
