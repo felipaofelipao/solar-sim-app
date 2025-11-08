@@ -10,7 +10,7 @@ AREA_PAINEL_M2 = 2.3
 FATOR_EMISSAO_CO2_KWH = 0.075
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="SolarSim | Calculadora Solar", page_icon="☀️", layout="wide")
+st.set_page_config(page_title="SolarSim | Simulador Solar", page_icon="☀️", layout="wide")
 
 # --- LOCALE (com fallback) ---
 try:
@@ -20,149 +20,198 @@ except:
 
 
 def formatar_reais(valor: float) -> str:
+    """Formata um float para o padrão R$ X.XXX,XX com fallback."""
     try:
         return locale.currency(valor, grouping=True)
     except:
         return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-# --- BASES (sem mudanças) ---
+# --- BASES DE DADOS (DICIONÁRIOS) ---
+# --- MUDANÇA: Foco exclusivo em Rio das Ostras ---
 HSP_CAPITAIS = {
-    "Aracaju (SE)": 5.15, "Belém (PA)": 4.44, "Belo Horizonte (MG)": 5.47,
-    "Boa Vista (RR)": 5.37, "Brasília (DF)": 5.61, "Campo Grande (MS)": 5.51,
-    "Cuiabá (MT)": 5.51, "Curitiba (PR)": 4.54, "Florianópolis (SC)": 4.68,
-    "Fortaleza (CE)": 6.13, "Goiânia (GO)": 5.75, "João Pessoa (PB)": 5.86,
-    "Macapá (AP)": 5.10, "Maceió (AL)": 5.67, "Manaus (AM)": 4.27,
-    "Natal (RN)": 6.13, "Palmas (TO)": 5.81, "Porto Alegre (RS)": 4.79,
-    "Porto Velho (RO)": 4.67, "Recife (PE)": 5.81, "Rio Branco (AC)": 4.21,
-    "Rio de Janeiro (RJ)": 5.13, "Salvador (BA)": 5.81, "São Luís (MA)": 6.30,
-    "São Paulo (SP)": 4.88, "Teresina (PI)": 6.42, "Vitória (ES)": 5.25,
+    "Rio das Ostras (RJ)": 4.98
 }
 
+# --- MUDANÇA: Foco exclusivo em Rio das Ostras (usando média do RJ) ---
 CUSTO_WP_CAPITAIS = {
-    "Porto Velho (RO)": 2.17, "Rio Branco (AC)": 2.23, "Manaus (AM)": 2.38, "Boa Vista (RR)": 2.23, "Macapá (AP)": 2.25,
-    "Belém (PA)": 2.88, "Palmas (TO)": 2.30, "São Luís (MA)": 2.48, "Teresina (PI)": 2.42, "Fortaleza (CE)": 2.45,
-    "Natal (RN)": 2.39, "João Pessoa (PB)": 2.46, "Recife (PE)": 2.49, "Maceió (AL)": 2.39, "Aracaju (SE)": 2.42,
-    "Salvador (BA)": 2.48, "Brasília (DF)": 2.52, "Goiânia (GO)": 2.41, "Cuiabá (MT)": 2.29, "Campo Grande (MS)": 2.39,
-    "Belo Horizonte (MG)": 2.70, "Vitória (ES)": 2.40, "Rio de Janeiro (RJ)": 2.49, "São Paulo (SP)": 2.40,
-    "Curitiba (PR)": 2.38, "Florianópolis (SC)": 2.36, "Porto Alegre (RS)": 2.60,
+    "Rio das Ostras (RJ)": 2.49
 }
 
 
-# --- CÁLCULO ---
+# --- FUNÇÕES DE CÁLCULO (COM ESTRATIFICAÇÃO E INVERSOR) ---
+
 def calcular_sistema_solar(consumo_kwh, tarifa, hsp, custo_wp_regional):
-    # Esta função é a "Calculadora por Consumo"
+    """Calculadora por Consumo (kWh -> R$)"""
     consumo_diario_kwh = consumo_kwh / 30
     potencia_necessaria_kwp = consumo_diario_kwh / (hsp * TAXA_DESEMPENHO)
     potencia_necessaria_wp = potencia_necessaria_kwp * 1000
 
     numero_paineis = max(1, round(potencia_necessaria_wp / POTENCIA_PAINEL_WP))
-    area_total_m2 = numero_paineis * AREA_PAINEL_M2
     potencia_final_sistema_wp = numero_paineis * POTENCIA_PAINEL_WP
     potencia_kwp_final = potencia_final_sistema_wp / 1000
+    area_total_m2 = numero_paineis * AREA_PAINEL_M2
+
+    # Cálculo do Inversor (Oversizing de 1.25)
+    inversor_kw_rec = potencia_kwp_final / 1.25
 
     geracao_diaria_kwh = potencia_kwp_final * hsp * TAXA_DESEMPENHO
     geracao_mensal_kwh = geracao_diaria_kwh * 30
-
     custo_total_estimado = potencia_final_sistema_wp * custo_wp_regional
     economia_mensal_reais = min(geracao_mensal_kwh, consumo_kwh) * tarifa
-
     geracao_anual_kwh = geracao_mensal_kwh * 12
     co2_evitado_anual_kg = geracao_anual_kwh * FATOR_EMISSAO_CO2_KWH
 
+    # Estratificação de Custos
+    custos_detalhados = {
+        "Painéis Fotovoltaicos": custo_total_estimado * 0.40,
+        "Inversor(es)": custo_total_estimado * 0.20,
+        "Estruturas, Cabos e Proteções": custo_total_estimado * 0.15,
+        "Mão de Obra e Projeto": custo_total_estimado * 0.25
+    }
+
     return {
         "potencia_kwp": round(potencia_kwp_final, 2),
+        "inversor_kw_recomendado": round(inversor_kw_rec, 2),
         "numero_paineis": numero_paineis,
         "area_m2": round(area_total_m2, 2),
         "custo_total_estimado_site": custo_total_estimado,
         "economia_mensal_reais": economia_mensal_reais,
         "co2_evitado_kg": round(co2_evitado_anual_kg, 2),
         "geracao_mensal": round(geracao_mensal_kwh, 2),
+        "custos_detalhados": custos_detalhados
     }
 
 
-# --- NOVA FUNÇÃO ---
 def calcular_sistema_por_orcamento(orcamento, custo_wp_regional, consumo_kwh, tarifa, hsp):
-    # Esta é a "Calculadora por Orçamento" (lógica inversa)
+    """Calculadora por Orçamento (R$ -> kWh)"""
 
-    # 1. Descobre a potência exata que o orçamento pode comprar
     potencia_final_sistema_wp = orcamento / custo_wp_regional
     potencia_kwp_final = potencia_final_sistema_wp / 1000
 
-    # 2. Deriva painéis e área dessa potência
+    # Cálculo do Inversor
+    inversor_kw_rec = potencia_kwp_final / 1.25
+
     numero_paineis = max(1, round(potencia_final_sistema_wp / POTENCIA_PAINEL_WP))
     area_total_m2 = numero_paineis * AREA_PAINEL_M2
 
-    # Nota: Poderíamos recalcular a potência com base nos painéis arredondados,
-    # mas para simplicidade, vamos usar a potência exata que o dinheiro compra.
-    # Se quiséssemos ser mais precisos:
-    # numero_paineis = max(1, int(potencia_final_sistema_wp / POTENCIA_PAINEL_WP))
-    # potencia_final_sistema_wp = numero_paineis * POTENCIA_PAINEL_WP
-    # potencia_kwp_final = potencia_final_sistema_wp / 1000
-    # area_total_m2 = numero_paineis * AREA_PAINEL_M2
-    # (Vamos manter a lógica mais simples por enquanto)
-
-    # 3. Calcula a geração e economia para ESSA potência
     geracao_diaria_kwh = potencia_kwp_final * hsp * TAXA_DESEMPENHO
     geracao_mensal_kwh = geracao_diaria_kwh * 30
-
-    # A economia ainda é limitada pelo consumo original
     economia_mensal_reais = min(geracao_mensal_kwh, consumo_kwh) * tarifa
-
     geracao_anual_kwh = geracao_mensal_kwh * 12
     co2_evitado_anual_kg = geracao_anual_kwh * FATOR_EMISSAO_CO2_KWH
 
+    # Estratificação de Custos
+    custos_detalhados = {
+        "Painéis Fotovoltaicos": orcamento * 0.40,
+        "Inversor(es)": orcamento * 0.20,
+        "Estruturas, Cabos e Proteções": orcamento * 0.15,
+        "Mão de Obra e Projeto": orcamento * 0.25
+    }
+
     return {
         "potencia_kwp": round(potencia_kwp_final, 2),
+        "inversor_kw_recomendado": round(inversor_kw_rec, 2),
         "numero_paineis": numero_paineis,
         "area_m2": round(area_total_m2, 2),
-        "custo_total_estimado_site": orcamento,  # O custo é o próprio orçamento
+        "custo_total_estimado_site": orcamento,
         "economia_mensal_reais": economia_mensal_reais,
         "co2_evitado_kg": round(co2_evitado_anual_kg, 2),
         "geracao_mensal": round(geracao_mensal_kwh, 2),
+        "custos_detalhados": custos_detalhados
     }
 
 
+def estimar_consumo_casa_nova(pessoas, chuveiros, ar_cond):
+    """Estima o consumo para uma casa nova (simulação)."""
+    consumo_base_pessoas = pessoas * 60
+    consumo_chuveiros = chuveiros * 70
+    consumo_ar = ar_cond * 100
+    return consumo_base_pessoas + consumo_chuveiros + consumo_ar
+
+
 def formatar_payback(custo, economia_mensal):
+    """Calcula e formata o payback em anos e meses."""
     if economia_mensal > 0:
         payback_anos = custo / (economia_mensal * 12)
     else:
         return "Não aplicável"
     anos = int(payback_anos)
     meses = round((payback_anos - anos) * 12)
-
-    if meses == 12:
+    if meses == 12:  # Arredonda 11.5+ meses para 1 ano
         anos += 1
         meses = 0
-
     return f"~ {anos} anos e {meses} meses" if anos else f"~ {meses} meses"
 
 
 # ========= INTERFACE =========
-st.title("☀️ SolarSim: Calculadora Solar Residencial")
+
+st.title("☀️ SolarSim: Simulador Solar Residencial")
 st.markdown(
     "Simule o custo, economia e benefícios ambientais da energia solar. Preencha os campos abaixo para começar!")
 st.divider()
 
-# 1) Inputs
+# --- MODO DE SIMULAÇÃO ---
+st.subheader("1️⃣ Modo de Simulação")
+modo_simulacao = st.radio(
+    "Como deseja simular?",
+    ("Com base na minha conta de luz (Já moro no local)",
+     "Com base em uma estimativa (Estou construindo)"),
+    horizontal=True,
+    key="modo_simulacao"
+)
+
+# 1) Inputs (Consumo e Localização)
 col1, col2 = st.columns(2)
 with col1:
-    st.subheader("1️⃣ Seus Dados de Consumo")
-    consumo = st.number_input("Consumo médio mensal (kWh):", min_value=50, value=300, step=10, key="consumo")
-    tarifa = st.number_input("Tarifa de energia (R$/kWh):", min_value=0.30, max_value=1.50, value=0.85, step=0.01,
-                             format="%.2f", key="tarifa")
-with col2:
-    st.subheader("2️⃣ Sua Localização")
-    cidade_selecionada = st.selectbox("Selecione a capital mais próxima:", sorted(HSP_CAPITAIS.keys()), key="cidade")
+    st.subheader("2️⃣ Seus Dados")
 
-# Cálculo temporário para estimativa
+    # Lógica condicional para consumo (Conta vs. Estimativa)
+    if modo_simulacao == "Com base na minha conta de luz (Já moro no local)":
+        consumo = st.number_input(
+            "Consumo médio mensal (kWh):",
+            min_value=50, max_value=10000, value=300, step=10, key="consumo",
+            help="Abra sua conta de luz (Ex: Enel) e procure pelo campo 'Consumo Faturado em kWh' ou 'Total Consumo Mês'."
+        )
+    else:
+        st.markdown("Preencha os dados da sua futura casa:")
+        c_pessoas = st.number_input("Quantas pessoas vão morar?", min_value=1, value=3, step=1, key="c_pessoas")
+        c_chuveiros = st.number_input("Quantos chuveiros elétricos?", min_value=0, value=1, step=1, key="c_chuveiros")
+        c_ar = st.number_input("Quantos aparelhos de ar condicionado?", min_value=0, value=1, step=1, key="c_ar")
+
+        # Calcula o consumo estimado e o armazena
+        consumo = estimar_consumo_casa_nova(c_pessoas, c_chuveiros, c_ar)
+        st.info(f"Seu consumo estimado é de **{consumo} kWh/mês**.")
+
+    # Tooltip (help) na tarifa
+    tarifa = st.number_input(
+        "Tarifa de energia (R$/kWh):",
+        min_value=0.30, max_value=1.50, value=0.85, step=0.01, format="%.2f", key="tarifa",
+        help="Some os valores da 'Tarifa de Energia (TE)' e da 'Tarifa de Uso (TUSD)' da sua conta. Ex: (TE 0,45 + TUSD 0,40 = 0,85)"
+    )
+
+with col2:
+    st.subheader("3️⃣ Sua Localização")
+    # --- MUDANÇA: Selectbox desabilitado com opção única ---
+    cidades_ordenadas = sorted(HSP_CAPITAIS.keys())
+
+    cidade_selecionada = st.selectbox(
+        "Localização da Simulação:",
+        cidades_ordenadas,
+        index=0,  # Só tem um item, então o índice é 0
+        key="cidade",
+        disabled=True  # Desabilita a caixa
+    )
+
+# Cálculo temporário para estimativa de orçamento
+# A lógica de 'cidade_selecionada' é preservada
 hsp = HSP_CAPITAIS[cidade_selecionada]
 custo_wp = CUSTO_WP_CAPITAIS[cidade_selecionada]
 resultados_tmp = calcular_sistema_solar(consumo, tarifa, hsp, custo_wp)
 
 # 2) Orçamento
 st.divider()
-st.subheader("3️⃣ Orçamento e Investimento")
+st.subheader("4️⃣ Orçamento e Investimento")
 col_orc, col_val = st.columns(2)
 with col_orc:
     escolha_orcamento = st.radio("Como deseja inserir o valor do investimento?",
@@ -179,49 +228,51 @@ with col_val:
         st.info(formatar_reais(resultados_tmp["custo_total_estimado_site"]))
         custo_final = resultados_tmp["custo_total_estimado_site"]
 
-# --- MUDANÇA DE LÓGICA AQUI ---
-# Não calculamos o payback aqui fora, pois os dados podem mudar
-#
-# payback_str = formatar_payback(custo_final, resultados_tmp["economia_mensal_reais"]) # <- LINHA ANTIGA REMOVIDA
+# 3) Botão Calcular (Salva em Session State)
+if st.button("⚡ Simular meu sistema solar", type="primary", use_container_width=True):
 
-# 3) Calcular (salva em session_state)
-if st.button("⚡ Calcular meu sistema solar", type="primary", use_container_width=True):
+    # Busca os valores atuais dos inputs
+    if st.session_state.modo_simulacao == "Com base na minha conta de luz (Já moro no local)":
+        consumo_atual = st.session_state.consumo
+    else:
+        consumo_atual = estimar_consumo_casa_nova(
+            st.session_state.c_pessoas,
+            st.session_state.c_chuveiros,
+            st.session_state.c_ar
+        )
 
-    # Pega os valores dos inputs no momento do clique
-    consumo_atual = st.session_state.consumo
     tarifa_atual = st.session_state.tarifa
-    cidade_atual = st.session_state.cidade
+    cidade_atual = st.session_state.cidade  # <- Isso funciona por causa do selectbox (mesmo desabilitado)
     hsp_atual = HSP_CAPITAIS[cidade_atual]
     custo_wp_atual = CUSTO_WP_CAPITAIS[cidade_atual]
     escolha_atual = st.session_state.escolha_orc
 
+    # Lógica principal: calcula por consumo ou por orçamento?
     if escolha_atual == 'Inserir meu Orçamento Personalizado':
-        # Pega o custo personalizado
         custo_final_atual = st.session_state.custo_pers
-        # Roda a calculadora inversa (por orçamento)
-        dados_finais = calcular_sistema_por_orcamento(custo_final_atual, custo_wp_atual, consumo_atual, tarifa_atual,
-                                                      hsp_atual)
+        dados_finais = calcular_sistema_por_orcamento(
+            custo_final_atual, custo_wp_atual, consumo_atual, tarifa_atual, hsp_atual
+        )
     else:
-        # Pega o custo estimado
-        # Roda a calculadora normal (por consumo)
-        dados_finais = calcular_sistema_solar(consumo_atual, tarifa_atual, hsp_atual, custo_wp_atual)
+        dados_finais = calcular_sistema_solar(
+            consumo_atual, tarifa_atual, hsp_atual, custo_wp_atual
+        )
         custo_final_atual = dados_finais["custo_total_estimado_site"]
 
-    # Agora calcula o payback com os dados corretos
     payback_final_str = formatar_payback(custo_final_atual, dados_finais["economia_mensal_reais"])
 
-    # Salva TUDO no session_state
+    # Salva TUDO no session_state para persistir os resultados
     st.session_state.res = {
         "cidade": cidade_atual,
         "hsp": hsp_atual,
         "consumo": consumo_atual,
         "tarifa": tarifa_atual,
         "custo_final": custo_final_atual,
-        "dados": dados_finais,  # Salva os dados corretos
-        "payback": payback_final_str,  # Salva o payback correto
+        "dados": dados_finais,
+        "payback": payback_final_str,
     }
 
-# 4) Mostrar resultados se houver sessão salva
+# 4) Mostrar resultados (se houver dados na sessão)
 if "res" in st.session_state:
     R = st.session_state.res
     dados = R["dados"]
@@ -230,30 +281,68 @@ if "res" in st.session_state:
     st.subheader(f"✅ Resultados da Simulação — {R['cidade']}")
 
     c1, c2, c3 = st.columns(3)
+    # Coluna 1: Investimento e Estratificação
     with c1:
         st.metric("Investimento Total Considerado", formatar_reais(R["custo_final"]))
-        st.metric("Potência do Sistema", f"{dados['potencia_kwp']} kWp")
+        st.markdown("**Estimativa de Custos:**")
+        for item, valor in dados["custos_detalhados"].items():
+            st.text(f"- {item}: {formatar_reais(valor)}")
+
+    # Coluna 2: Detalhes do Sistema (com Inversor)
     with c2:
-        st.metric("Economia Mensal Estimada", formatar_reais(dados["economia_mensal_reais"]))
+        st.metric("Potência do Sistema (Painéis)", f"{dados['potencia_kwp']} kWp")
+        st.metric(
+            "Inversor Recomendado (Tamanho CA)",
+            f"~ {dados['inversor_kw_recomendado']} kW",
+            help="Este é o tamanho nominal (em CA) do inversor, considerando um 'oversizing' padrão de 125% da potência dos painéis (em CC)."
+        )
         st.metric("Quantidade de Painéis", f"{dados['numero_paineis']}")
-    with c3:
-        st.metric("Retorno do Investimento (Payback)", R["payback"])
         st.metric("Área Mínima Necessária", f"{dados['area_m2']} m²")
+
+    # Coluna 3: Retorno Financeiro
+    with c3:
+        st.metric("Economia Mensal Estimada", formatar_reais(dados["economia_mensal_reais"]))
+        st.metric("Retorno do Investimento (Payback)", R["payback"])
+
+    # Bloco de Explicação do Inversor
+    st.info(
+        """
+        #### 💡 Qual Tipo de Inversor Escolher?
+
+        O tamanho acima é uma estimativa da **potência**. Sua maior decisão será o **tipo** de inversor:
+
+        * **1. Inversor de String (ou Central):**
+            * **O que é:** Uma única "caixa" que gerencia todos os seus painéis juntos.
+            * **Ideal para:** Telhados grandes, sem nenhuma sombra, onde o custo é o principal fator. Se uma sombra atingir um painel, pode prejudicar a geração de todos os painéis ligados a ele.
+
+        * **2. Microinversor:**
+            * **O que é:** Vários aparelhos pequenos instalados no telhado, um para cada painel (ou para cada 2 a 4 painéis).
+            * **Ideal para:** Telhados com sombras parciais (de árvores, chaminés, etc.), telhados com várias "águas" (diferentes orientações) ou para quem deseja monitorar cada painel individualmente.
+
+        **Converse com seu instalador sobre qual tipo é melhor para o seu telhado!**
+        """
+    )
 
     st.success(
         f"🌳 *Benefício Ambiental:* Este sistema evita cerca de *{dados['co2_evitado_kg']} kg de CO₂/ano* — o equivalente a *{dados['co2_evitado_kg'] / 150:.1f} árvores!*")
 
-    # ----- Toggle dos gráficos (persistente) -----
+    # ----- Gráficos -----
     st.subheader("📈 Visualização dos Resultados")
-    modo = st.radio("Escolha o tipo de gráfico:", ["Mensal", "Anual"], horizontal=True, key="modo_grafico")
+    modo_grafico = st.radio("Escolha o tipo de gráfico:", ["Mensal", "Anual"], horizontal=True, key="modo_grafico")
 
-    # Dados mensais com sazonalidade
+    # --- CORREÇÃO DO FATOR SAZONAL (BASEADO NOS DADOS DE RIO DAS OSTRAS) ---
+    # Agora com picos no verão (Jan/Fev) e vales no inverno (Jun/Jul)
     meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-    fator_sazonal = [0.95, 0.97, 1.00, 1.05, 1.10, 1.12, 1.08, 1.02, 0.98, 0.96, 0.94, 0.93]
-    # A geração mensal agora é baseada nos 'dados' salvos (que podem ser do orçamento)
-    geracao_mensal = [dados["geracao_mensal"] * f for f in fator_sazonal]
+    # Valores: (HSP do Mês / Média 4.98)
+    fator_sazonal_correto = [1.118, 1.223, 1.052, 1.014, 0.912, 0.890, 0.881, 1.014, 0.960, 0.984, 0.918, 1.042]
 
-    if modo == "Mensal":
+    geracao_mensal = [dados["geracao_mensal"] * f for f in fator_sazonal_correto]
+
+    # Cores para Daltônicos (Alto Contraste)
+    domain_ = ["Consumo (kWh)", "Geração Solar (kWh)"]
+    range_ = ["#FF4B4B", "#0068C9"]  # Vermelho e Azul
+
+    if modo_grafico == "Mensal":
         df = pd.DataFrame({
             "Mês": meses,
             "Consumo (kWh)": [R["consumo"]] * 12,
@@ -263,10 +352,9 @@ if "res" in st.session_state:
         grafico = alt.Chart(df).mark_line(point=True).encode(
             x=alt.X("Mês", sort=meses),
             y=alt.Y("Energia (kWh)", title="Energia Mensal (kWh)"),
-            color=alt.Color("Categoria", scale=alt.Scale(domain=["Consumo (kWh)", "Geração Solar (kWh)"],
-                                                         range=["#FF4B4B", "#54A8A6"])),
+            color=alt.Color("Categoria", scale=alt.Scale(domain=domain_, range=range_)),
             tooltip=["Mês", "Categoria", "Energia (kWh)"]
-        ).properties(height=350, title="📊 Comparativo Mensal: Consumo x Geração Solar")
+        ).properties(height=350, title="📊 Comparativo Mensal: Consumo x Geração Solar").interactive()
     else:
         df_anual = pd.DataFrame({
             "Categoria": ["Consumo Anual", "Geração Solar Anual"],
@@ -274,19 +362,18 @@ if "res" in st.session_state:
         })
         grafico = alt.Chart(df_anual).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
             x="Categoria",
-            y=alt.Y("Energia (kWh/ano)", title="Energia Anual (kWh)"),
-            color=alt.Color("Categoria", scale=alt.Scale(domain=["Consumo Anual", "Geração Solar Anual"],
-                                                         range=["#FF4B4B", "#54A8A6"])),
+            y=alt.Y("Energia (kWh/ano)", title="Energia Anual (kWh)"),  # <- Corrigido
+            color=alt.Color("Categoria",
+                            scale=alt.Scale(domain=["Consumo Anual", "Geração Solar Anual"], range=range_)),
             tooltip=["Categoria", "Energia (kWh/ano)"]
-        ).properties(height=350, title="📊 Comparativo Anual: Consumo x Geração Solar")
+        ).properties(height=350, title="📊 Comparativo Anual: Consumo x Geração Solar").interactive()
 
     st.altair_chart(grafico, use_container_width=True)
 
-    # ----- 💡 Dica (mantida) -----
     st.info(
         "💡 **Dica:** A sua geração de energia pode ser maior que o seu consumo! Isso gera créditos de energia que podem ser usados em até 60 meses.")
 
-    # ----- Premissas (mantido) -----
+    # ----- Expanders de Informações Adicionais -----
     with st.expander("📘 Premissas e limitações da simulação"):
         st.markdown(f"""
         - *HSP (Horas de Sol Pleno):* média de *{R['hsp']}h/dia* para {R['cidade']}, baseada em dados do CRESESB/SWERA.    
@@ -294,16 +381,32 @@ if "res" in st.session_state:
         - *Custo médio do Wp instalado na região:* **{formatar_reais(CUSTO_WP_CAPITAIS[R['cidade']])}/Wp**.    
         - *Economia Mensal:* calculada sobre a tarifa cheia informada (não considera taxa mínima da distribuidora).    
         - *Variação sazonal:* padrão médio de irradiação no Brasil.    
-        - *Emissão de CO₂ evitada:* fator médio do SIN.    
+        - *Emissão de CO₂ evitada:* fator médio do SIN.
+        - **Cabos e Proteções:** O dimensionamento de cabos (bitola) e disjuntores **NÃO** está incluído. Isso deve ser feito por um engenheiro eletricista qualificado durante a visita técnica, pois depende da distância e das condições específicas da sua residência.
         """)
 
-    # ----- Quer saber mais? (Com Vídeo Incorporado) -----
     st.subheader("📚 Quer saber mais?")
     with st.expander("Clique aqui para expandir seus conhecimentos sobre Energia Solar"):
         st.markdown("#### Como Funciona a Energia Solar (Explicação Simples)")
         col_vazio_esq, col_video, col_vazio_dir = st.columns([1, 3, 1])
         with col_video:
             st.video("https://www.youtube.com/watch?v=nKdq6BHBR0M")
+
+        st.markdown("---")
+
+        st.markdown("#### Como funcionam as Tarifas (Ex: Enel)?")
+        st.markdown(
+            """
+            Sua conta de luz não é um valor único. Ela é composta por duas tarifas principais:
+
+            * **TE (Tarifa de Energia):** O custo da energia elétrica que você de fato consumiu.
+            * **TUSD (Tarifa de Uso do Sistema de Distribuição):** O custo para "transportar" essa energia até sua casa (uso dos postes, fios, etc.).
+
+            Para o cálculo da **economia** com energia solar, consideramos a soma dessas duas, pois o sistema fotovoltaico gera créditos que abatem ambas as faturas.
+
+            **Cuidado:** Você sempre pagará a **Taxa Mínima** (ou "custo de disponibilidade"), que é uma taxa para estar conectado à rede, mesmo que sua geração seja maior que o consumo. Nosso simulador não considera essa taxa mínima no cálculo da economia.
+            """
+        )
 
         st.markdown("---")
 
