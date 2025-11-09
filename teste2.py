@@ -209,20 +209,20 @@ modo_simulacao = st.radio(
 col1, col2 = st.columns(2)
 with col1:
     st.subheader("2️⃣ Seus Dados")
-
+    
     # Lógica condicional para consumo
     if modo_simulacao == "Com base na minha conta de luz (Já moro no local)":
-
-        # --- MUDANÇA: Tooltip com Markdown e Imagem ---
+        
+        # --- CORREÇÃO DE IMAGEM AQUI ---
         consumo = st.number_input(
-            "Consumo médio mensal (kWh):",
+            "Consumo médio mensal (kWh):", 
             min_value=50, max_value=10000, value=300, step=10, key="consumo",
             help="""
             Abra sua conta de luz (Ex: Enel) e procure pelo campo 'Consumo Faturado em kWh' ou 'Total Consumo Mês'.
-
+            
             **Veja onde encontrar:**
-
-            ![Exemplo Conta de Luz](https://github.com/felipaofelipao/solar-sim-app/blob/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_52053dd3.JPG)
+            
+            ![Exemplo Conta de Luz](https://raw.githubusercontent.com/felipaofelipao/solar-sim-app/refs/heads/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_52053dd3.JPG)
             """
         )
     else:
@@ -230,25 +230,49 @@ with col1:
         c_pessoas = st.number_input("Quantas pessoas vão morar?", min_value=1, value=3, step=1, key="c_pessoas")
         c_chuveiros = st.number_input("Quantos chuveiros elétricos?", min_value=0, value=1, step=1, key="c_chuveiros")
         c_ar = st.number_input("Quantos aparelhos de ar condicionado?", min_value=0, value=1, step=1, key="c_ar")
-        c_freezer = st.number_input("Quantos freezers (além da geladeira)?", min_value=0, value=0, step=1,
-                                    key="c_freezer")
-        c_home_office = st.number_input("Pessoas em home office (uso intenso de PC)?", min_value=0, value=0, step=1,
-                                        key="c_home_office")
-
+        c_freezer = st.number_input("Quantos freezers (além da geladeira)?", min_value=0, value=0, step=1, key="c_freezer")
+        c_home_office = st.number_input("Pessoas em home office (uso intenso de PC)?", min_value=0, value=0, step=1, key="c_home_office")
+        
         consumo = estimar_consumo_casa_nova(c_pessoas, c_chuveiros, c_ar, c_freezer, c_home_office)
         st.info(f"Seu consumo estimado é de **{consumo} kWh/mês**.")
 
-    # --- MUDANÇA: Tooltip com Markdown e Imagem ---
-    st.markdown(
-        "**Tarifa de Energia (R$/kWh):**",
-        help="""
-        Some todos os valores de 'Tarifa de Energia (TE)' e 'Tarifa de Uso (TUSD)' da sua conta. Use o botão '+' para adicionar quantos campos precisar.
+    # --- CORREÇÃO DO "I'ZINHO QUEBRADO" AQUI ---
+    
+    # 1. Removemos o 'help' daqui
+    st.markdown("**Tarifa de Energia (R$/kWh):**") 
 
-        **Veja onde encontrar:**
+    # Loop para exibir os campos de tarifa existentes
+    for i in range(len(st.session_state.tarifas_list)):
+        
+        # 2. Definimos o help_text
+        help_text_tarifa = None
+        if i == 0: # Adiciona o help SÓ no primeiro campo
+            help_text_tarifa = """
+            Some todos os valores de 'Tarifa de Energia (TE)' e 'Tarifa de Uso (TUSD)' da sua conta. Use o botão '+' para adicionar quantos campos precisar.
+            
+            **Veja onde encontrar:**
+            
+            ![Exemplo Conta de Luz](https://raw.githubusercontent.com/felipaofelipao/solar-sim-app/refs/heads/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_00537b91.JPG)
+            """
+            
+        # 3. Adicionamos o 'help' aqui dentro
+        st.session_state.tarifas_list[i] = st.number_input(
+            f"Valor {i+1} (TE ou TUSD)", 
+            min_value=0.00, 
+            max_value=3.00, 
+            value=st.session_state.tarifas_list[i], 
+            step=0.01, 
+            format="%.2f", 
+            key=f"tarifa_input_{i}",
+            help=help_text_tarifa # O 'help' agora está no st.number_input
+        )
+    
+    if st.button("Adicionar outro valor (+)", key="add_tarifa"):
+        st.session_state.tarifas_list.append(0.0)
+        st.rerun() 
 
-        ![Exemplo Conta de Luz](https://github.com/felipaofelipao/solar-sim-app/blob/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_00537b91.JPG)
-        """
-    )
+    tarifa_calculada = sum(st.session_state.tarifas_list)
+    st.info(f"Sua Tarifa Total: **{formatar_reais(tarifa_calculada)} / kWh**")
 
     # Loop para exibir os campos de tarifa existentes
     for i in range(len(st.session_state.tarifas_list)):
@@ -511,3 +535,4 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
