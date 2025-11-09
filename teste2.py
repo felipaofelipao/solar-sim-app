@@ -12,35 +12,75 @@ FATOR_EMISSAO_CO2_KWH = 0.075
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="SolarSim | Simulador Solar", page_icon="☀️", layout="wide")
 
+# --- INICIALIZAÇÃO DO SESSION STATE (PARA FONTES E TARIFAS) ---
+if "tamanho_fonte" not in st.session_state:
+    st.session_state.tamanho_fonte = "Padrão"  # Define o valor padrão
+if "tarifas_list" not in st.session_state:
+    st.session_state.tarifas_list = [0.85]  # Lista para tarifas iterativas
+
+# --- SIDEBAR DE ACESSIBILIDADE ---
+# MUDANÇA: Adicionado ícone no título
+st.sidebar.title("♿ Opções de Acessibilidade")
+st.sidebar.markdown("Use esta opção caso tenha dificuldade de leitura.")
+st.sidebar.radio(
+    "Tamanho da Fonte",
+    ("Padrão", "Grande", "Muito Grande"),
+    key="tamanho_fonte",
+    help="Aumenta o tamanho de todas as fontes no simulador."
+)
+
+# --- CSS CONDICIONAL (COM CORREÇÃO PARA METRICS) ---
+CSS_GRANDE = """
+<style>
+    /* Base */
+    html, body, [class*="st-"], [data-testid="stAppViewContainer"] { font-size: 1.15rem; }
+    /* Correção Específica para Métricas */
+    [data-testid="stMetricLabel"] { font-size: 1.1rem !important; }
+    [data-testid="stMetricValue"] { font-size: 2.2rem !important; }
+    /* Outros Elementos */
+    [data-testid="stTooltipContent"] p { font-size: 1.1rem; }
+    [data-testid="stExpander"] summary { font-size: 1.25rem; }
+    [data-testid="stInfo"], [data-testid="stSuccess"] { font-size: 1.1rem; }
+</style>
+"""
+
+CSS_MUITO_GRANDE = """
+<style>
+    /* Base */
+    html, body, [class*="st-"], [data-testid="stAppViewContainer"] { font-size: 1.25rem; }
+    /* Correção Específica para Métricas */
+    [data-testid="stMetricLabel"] { font-size: 1.2rem !important; }
+    [data-testid="stMetricValue"] { font-size: 2.5rem !important; }
+    /* Outros Elementos */
+    [data-testid="stTooltipContent"] p { font-size: 1.2rem; }
+    [data-testid="stExpander"] summary { font-size: 1.35rem; }
+    [data-testid="stInfo"], [data-testid="stSuccess"] { font-size: 1.2rem; }
+</style>
+"""
+
+if st.session_state.tamanho_fonte == "Grande":
+    st.markdown(CSS_GRANDE, unsafe_allow_html=True)
+elif st.session_state.tamanho_fonte == "Muito Grande":
+    st.markdown(CSS_MUITO_GRANDE, unsafe_allow_html=True)
+
 # --- LOCALE (com fallback) ---
 try:
-    # Tenta configurar o locale para Português do Brasil
     locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 except:
-    # Se falhar (comum em servidores/deploy), usa o fallback
     pass
 
 
 def formatar_reais(valor: float) -> str:
     """Formata um float para o padrão R$ X.XXX,XX com fallback."""
     try:
-        # Tenta usar o locale pt_BR
         return locale.currency(valor, grouping=True)
     except:
-        # Fallback manual caso o locale falhe
         return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-# --- BASES DE DADOS (DICIONÁRIOS) ---
-# Foco exclusivo em Rio das Ostras com média de HSP correta
-HSP_CAPITAIS = {
-    "Rio das Ostras (RJ)": 4.98
-}
-
-# Foco exclusivo em Rio das Ostras (usando média do RJ)
-CUSTO_WP_CAPITAIS = {
-    "Rio das Ostras (RJ)": 2.49
-}
+# --- BASES DE DADOS (Foco em Rio das Ostras) ---
+HSP_CAPITAIS = {"Rio das Ostras (RJ)": 4.98}
+CUSTO_WP_CAPITAIS = {"Rio das Ostras (RJ)": 2.49}
 
 
 # --- FUNÇÕES DE CÁLCULO (COM ESTRATIFICAÇÃO E INVERSOR) ---
@@ -55,8 +95,6 @@ def calcular_sistema_solar(consumo_kwh, tarifa, hsp, custo_wp_regional):
     potencia_final_sistema_wp = numero_paineis * POTENCIA_PAINEL_WP
     potencia_kwp_final = potencia_final_sistema_wp / 1000
     area_total_m2 = numero_paineis * AREA_PAINEL_M2
-
-    # Cálculo do Inversor (Oversizing de 1.25)
     inversor_kw_rec = potencia_kwp_final / 1.25
 
     geracao_diaria_kwh = potencia_kwp_final * hsp * TAXA_DESEMPENHO
@@ -66,7 +104,6 @@ def calcular_sistema_solar(consumo_kwh, tarifa, hsp, custo_wp_regional):
     geracao_anual_kwh = geracao_mensal_kwh * 12
     co2_evitado_anual_kg = geracao_anual_kwh * FATOR_EMISSAO_CO2_KWH
 
-    # Estratificação de Custos
     custos_detalhados = {
         "Painéis Fotovoltaicos": custo_total_estimado * 0.40,
         "Inversor(es)": custo_total_estimado * 0.20,
@@ -92,10 +129,7 @@ def calcular_sistema_por_orcamento(orcamento, custo_wp_regional, consumo_kwh, ta
 
     potencia_final_sistema_wp = orcamento / custo_wp_regional
     potencia_kwp_final = potencia_final_sistema_wp / 1000
-
-    # Cálculo do Inversor
     inversor_kw_rec = potencia_kwp_final / 1.25
-
     numero_paineis = max(1, round(potencia_final_sistema_wp / POTENCIA_PAINEL_WP))
     area_total_m2 = numero_paineis * AREA_PAINEL_M2
 
@@ -105,7 +139,6 @@ def calcular_sistema_por_orcamento(orcamento, custo_wp_regional, consumo_kwh, ta
     geracao_anual_kwh = geracao_mensal_kwh * 12
     co2_evitado_anual_kg = geracao_anual_kwh * FATOR_EMISSAO_CO2_KWH
 
-    # Estratificação de Custos
     custos_detalhados = {
         "Painéis Fotovoltaicos": orcamento * 0.40,
         "Inversor(es)": orcamento * 0.20,
@@ -126,12 +159,15 @@ def calcular_sistema_por_orcamento(orcamento, custo_wp_regional, consumo_kwh, ta
     }
 
 
-def estimar_consumo_casa_nova(pessoas, chuveiros, ar_cond):
+def estimar_consumo_casa_nova(pessoas, chuveiros, ar_cond, freezer, home_office):
     """Estima o consumo para uma casa nova (simulação)."""
     consumo_base_pessoas = pessoas * 60
     consumo_chuveiros = chuveiros * 70
     consumo_ar = ar_cond * 100
-    return consumo_base_pessoas + consumo_chuveiros + consumo_ar
+    consumo_freezer = freezer * 40
+    consumo_home_office = home_office * 60
+
+    return consumo_base_pessoas + consumo_chuveiros + consumo_ar + consumo_freezer + consumo_home_office
 
 
 def formatar_payback(custo, economia_mensal):
@@ -142,7 +178,7 @@ def formatar_payback(custo, economia_mensal):
         return "Não aplicável"
     anos = int(payback_anos)
     meses = round((payback_anos - anos) * 12)
-    if meses == 12:  # Arredonda 11.5+ meses para 1 ano
+    if meses == 12:
         anos += 1
         meses = 0
     return f"~ {anos} anos e {meses} meses" if anos else f"~ {meses} meses"
@@ -151,6 +187,10 @@ def formatar_payback(custo, economia_mensal):
 # ========= INTERFACE =========
 
 st.title("☀️ SolarSim: Simulador Solar Residencial")
+
+# --- NOVO: AVISO DE ACESSIBILIDADE ---
+st.info("👀 Dificuldade para ler? Ajuste o tamanho da fonte na barra lateral à esquerda!", icon="♿")
+
 st.markdown(
     "Simule o custo, economia e benefícios ambientais da energia solar. Preencha os campos abaixo para começar!")
 st.divider()
@@ -170,60 +210,96 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("2️⃣ Seus Dados")
 
-    # Lógica condicional para consumo (Conta vs. Estimativa)
+    # Lógica condicional para consumo
     if modo_simulacao == "Com base na minha conta de luz (Já moro no local)":
+
+        # --- MUDANÇA: Tooltip com Markdown e Imagem ---
         consumo = st.number_input(
             "Consumo médio mensal (kWh):",
             min_value=50, max_value=10000, value=300, step=10, key="consumo",
-            help="Abra sua conta de luz (Ex: Enel) e procure pelo campo 'Consumo Faturado em kWh' ou 'Total Consumo Mês'."
+            help="""
+            Abra sua conta de luz (Ex: Enel) e procure pelo campo 'Consumo Faturado em kWh' ou 'Total Consumo Mês'.
+
+            **Veja onde encontrar:**
+
+            ![Exemplo Conta de Luz](https://github.com/felipaofelipao/solar-sim-app/blob/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_52053dd3.JPG)
+            """
         )
     else:
         st.markdown("Preencha os dados da sua futura casa:")
         c_pessoas = st.number_input("Quantas pessoas vão morar?", min_value=1, value=3, step=1, key="c_pessoas")
         c_chuveiros = st.number_input("Quantos chuveiros elétricos?", min_value=0, value=1, step=1, key="c_chuveiros")
         c_ar = st.number_input("Quantos aparelhos de ar condicionado?", min_value=0, value=1, step=1, key="c_ar")
+        c_freezer = st.number_input("Quantos freezers (além da geladeira)?", min_value=0, value=0, step=1,
+                                    key="c_freezer")
+        c_home_office = st.number_input("Pessoas em home office (uso intenso de PC)?", min_value=0, value=0, step=1,
+                                        key="c_home_office")
 
-        # Calcula o consumo estimado e o armazena
-        consumo = estimar_consumo_casa_nova(c_pessoas, c_chuveiros, c_ar)
+        consumo = estimar_consumo_casa_nova(c_pessoas, c_chuveiros, c_ar, c_freezer, c_home_office)
         st.info(f"Seu consumo estimado é de **{consumo} kWh/mês**.")
 
-    # Tooltip (help) na tarifa
-    tarifa = st.number_input(
-        "Tarifa de energia (R$/kWh):",
-        min_value=0.30, max_value=1.50, value=0.85, step=0.01, format="%.2f", key="tarifa",
-        help="Some os valores da 'Tarifa de Energia (TE)' e da 'Tarifa de Uso (TUSD)' da sua conta. Ex: (TE 0,45 + TUSD 0,40 = 0,85)"
+    # --- MUDANÇA: Tooltip com Markdown e Imagem ---
+    st.markdown(
+        "**Tarifa de Energia (R$/kWh):**",
+        help="""
+        Some todos os valores de 'Tarifa de Energia (TE)' e 'Tarifa de Uso (TUSD)' da sua conta. Use o botão '+' para adicionar quantos campos precisar.
+
+        **Veja onde encontrar:**
+
+        ![Exemplo Conta de Luz](https://github.com/felipaofelipao/solar-sim-app/blob/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_00537b91.JPG)
+        """
     )
+
+    # Loop para exibir os campos de tarifa existentes
+    for i in range(len(st.session_state.tarifas_list)):
+        st.session_state.tarifas_list[i] = st.number_input(
+            f"Valor {i + 1} (TE ou TUSD)",
+            min_value=0.00,
+            max_value=3.00,
+            value=st.session_state.tarifas_list[i],
+            step=0.01,
+            format="%.2f",
+            key=f"tarifa_input_{i}"
+        )
+
+    # Botão para adicionar um novo campo de tarifa
+    if st.button("Adicionar outro valor (+)", key="add_tarifa"):
+        st.session_state.tarifas_list.append(0.0)
+        st.rerun()
+
+        # Calcula e armazena a tarifa total
+    tarifa_calculada = sum(st.session_state.tarifas_list)
+    st.info(f"Sua Tarifa Total: **{formatar_reais(tarifa_calculada)} / kWh**")
 
 with col2:
     st.subheader("3️⃣ Sua Localização")
-    # Selectbox desabilitado com opção única
     cidades_ordenadas = sorted(HSP_CAPITAIS.keys())
 
     cidade_selecionada = st.selectbox(
         "Localização da Simulação:",
         cidades_ordenadas,
-        index=0,  # Só tem um item, então o índice é 0
+        index=0,
         key="cidade",
-        disabled=True  # Desabilita a caixa
+        disabled=True
     )
 
-    # --- NOVO BLOCO: TIPO DE CONEXÃO ---
-    st.markdown("---")  # Divisor
+    st.markdown("---")
     st.subheader("Tipo de Conexão (Enel)")
+    # MUDANÇA: Ordem corrigida
     tipo_conexao = st.selectbox(
         "Qual sua conexão com a rede?",
-        ("Bifásica (Taxa Mínima 50 kWh)",
-         "Monofásica (Taxa Mínima 30 kWh)",
+        ("Monofásica (Taxa Mínima 30 kWh)",
+         "Bifásica (Taxa Mínima 50 kWh)",
          "Trifásica (Taxa Mínima 100 kWh)"),
-        index=0,  # Padrão para Bifásica
+        index=1,  # Padrão para Bifásica
         key="tipo_conexao",
         help="Isso define a taxa mínima (custo de disponibilidade) que você sempre pagará, mesmo gerando 100% da sua energia."
     )
 
-# Cálculo temporário para estimativa de orçamento
+# Cálculo temporário
 hsp = HSP_CAPITAIS[cidade_selecionada]
 custo_wp = CUSTO_WP_CAPITAIS[cidade_selecionada]
-resultados_tmp = calcular_sistema_solar(consumo, tarifa, hsp, custo_wp)
+resultados_tmp = calcular_sistema_solar(consumo, tarifa_calculada, hsp, custo_wp)
 
 # 2) Orçamento
 st.divider()
@@ -244,35 +320,35 @@ with col_val:
         st.info(formatar_reais(resultados_tmp["custo_total_estimado_site"]))
         custo_final = resultados_tmp["custo_total_estimado_site"]
 
-# 3) Botão Calcular (Salva em Session State)
+# 3) Botão Calcular
 if st.button("⚡ Simular meu sistema solar", type="primary", use_container_width=True):
 
-    # Busca os valores atuais dos inputs
     if st.session_state.modo_simulacao == "Com base na minha conta de luz (Já moro no local)":
         consumo_atual = st.session_state.consumo
     else:
         consumo_atual = estimar_consumo_casa_nova(
             st.session_state.c_pessoas,
             st.session_state.c_chuveiros,
-            st.session_state.c_ar
+            st.session_state.c_ar,
+            st.session_state.c_freezer,
+            st.session_state.c_home_office
         )
 
-    tarifa_atual = st.session_state.tarifa
+    tarifa_atual = sum(st.session_state.tarifas_list)
+
     cidade_atual = st.session_state.cidade
     hsp_atual = HSP_CAPITAIS[cidade_atual]
     custo_wp_atual = CUSTO_WP_CAPITAIS[cidade_atual]
     escolha_atual = st.session_state.escolha_orc
 
-    # --- NOVO: Lógica da Taxa Mínima ---
     conexao_atual = st.session_state.tipo_conexao
     if "Monofásica" in conexao_atual:
         minimo_kwh_atual = 30
     elif "Trifásica" in conexao_atual:
         minimo_kwh_atual = 100
     else:
-        minimo_kwh_atual = 50  # Padrão Bifásica
+        minimo_kwh_atual = 50
 
-    # Lógica principal: calcula por consumo ou por orçamento?
     if escolha_atual == 'Inserir meu Orçamento Personalizado':
         custo_final_atual = st.session_state.custo_pers
         dados_finais = calcular_sistema_por_orcamento(
@@ -285,11 +361,8 @@ if st.button("⚡ Simular meu sistema solar", type="primary", use_container_widt
         custo_final_atual = dados_finais["custo_total_estimado_site"]
 
     payback_final_str = formatar_payback(custo_final_atual, dados_finais["economia_mensal_reais"])
-
-    # --- NOVO: Cálculo de Saldo e Créditos ---
     saldo_kwh_final = dados_finais["geracao_mensal"] - consumo_atual
 
-    # Salva TUDO no session_state para persistir os resultados
     st.session_state.res = {
         "cidade": cidade_atual,
         "hsp": hsp_atual,
@@ -298,11 +371,11 @@ if st.button("⚡ Simular meu sistema solar", type="primary", use_container_widt
         "custo_final": custo_final_atual,
         "dados": dados_finais,
         "payback": payback_final_str,
-        "minimo_kwh": minimo_kwh_atual,  # Salva a taxa mínima
-        "saldo_kwh": saldo_kwh_final  # Salva o saldo
+        "minimo_kwh": minimo_kwh_atual,
+        "saldo_kwh": saldo_kwh_final
     }
 
-# 4) Mostrar resultados (se houver dados na sessão)
+# 4) Mostrar resultados
 if "res" in st.session_state:
     R = st.session_state.res
     dados = R["dados"]
@@ -311,14 +384,12 @@ if "res" in st.session_state:
     st.subheader(f"✅ Resultados da Simulação — {R['cidade']}")
 
     c1, c2, c3 = st.columns(3)
-    # Coluna 1: Investimento e Estratificação
     with c1:
         st.metric("Investimento Total Considerado", formatar_reais(R["custo_final"]))
         st.markdown("**Estimativa de Custos:**")
         for item, valor in dados["custos_detalhados"].items():
-            st.text(f"- {item}: {formatar_reais(valor)}")
+            st.markdown(f"**- {item}:** {formatar_reais(valor)}")
 
-    # Coluna 2: Detalhes do Sistema
     with c2:
         st.metric("Potência do Sistema (Painéis)", f"{dados['potencia_kwp']} kWp")
         st.metric(
@@ -329,101 +400,69 @@ if "res" in st.session_state:
         st.metric("Quantidade de Painéis", f"{dados['numero_paineis']}")
         st.metric("Área Mínima Necessária", f"{dados['area_m2']} m²")
 
-    # Coluna 3: Nova Realidade Financeira (Créditos e Taxa Mínima)
     with c3:
         saldo_kwh = R["saldo_kwh"]
         minimo_kwh = R["minimo_kwh"]
         tarifa = R["tarifa"]
 
         if saldo_kwh < 0:
-            # Caso 1: Geração MENOR que o consumo (Under-budget)
             consumo_rede_kwh = abs(saldo_kwh)
             kwh_a_pagar = max(consumo_rede_kwh, minimo_kwh)
             nova_fatura = kwh_a_pagar * tarifa
-
             st.metric("Nova Fatura Mensal Estimada", formatar_reais(nova_fatura))
             st.metric("Consumo restante da Rede", f"{consumo_rede_kwh:.0f} kWh / mês")
-
         else:
-            # Caso 2: Geração MAIOR que o consumo (Over-budget)
             creditos_kwh = saldo_kwh
-            nova_fatura = minimo_kwh * tarifa  # Pagará apenas a taxa mínima
-
+            nova_fatura = minimo_kwh * tarifa
             st.metric("Nova Fatura (Taxa Mínima)", formatar_reais(nova_fatura))
             st.metric("Créditos Gerados", f"{creditos_kwh:.0f} kWh / mês")
 
         st.metric("Retorno do Investimento (Payback)", R["payback"])
 
-    # Bloco de Explicação do Inversor
     st.info(
         """
         #### 💡 Qual Tipo de Inversor Escolher?
-
         O tamanho acima é uma estimativa da **potência**. Sua maior decisão será o **tipo** de inversor:
-
         * **1. Inversor de String (ou Central):**
             * **O que é:** Uma única "caixa" que gerencia todos os seus painéis juntos.
-            * **Ideal para:** Telhados grandes, sem nenhuma sombra, onde o custo é o principal fator. Se uma sombra atingir um painel, pode prejudicar a geração de todos os painéis ligados a ele.
-
+            * **Ideal para:** Telhados grandes, sem nenhuma sombra, onde o custo é o principal fator.
         * **2. Microinversor:**
             * **O que é:** Vários aparelhos pequenos instalados no telhado, um para cada painel (ou para cada 2 a 4 painéis).
-            * **Ideal para:** Telhados com sombras parciais (de árvores, chaminés, etc.), telhados com várias "águas" (diferentes orientações) ou para quem deseja monitorar cada painel individualmente.
-
-        **Converse com seu instalador sobre qual tipo é melhor para o seu telhado!**
+            * **Ideal para:** Telhados com sombras parciais (de árvores, chaminés, etc.) ou telhados com várias "águas" (diferentes orientações).
         """
     )
 
     st.success(
         f"🌳 *Benefício Ambiental:* Este sistema evita cerca de *{dados['co2_evitado_kg']} kg de CO₂/ano* — o equivalente a *{dados['co2_evitado_kg'] / 150:.1f} árvores!*")
 
-    # ----- Gráficos -----
-    st.subheader("📈 Visualização dos Resultados")
-    modo_grafico = st.radio("Escolha o tipo de gráfico:", ["Mensal", "Anual"], horizontal=True, key="modo_grafico")
+    st.subheader("📈 Comparativo Mensal: Consumo x Geração")
 
-    # Fator Sazonal CORRIGIDO (Baseado nos dados de 4.98)
     meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     fator_sazonal_correto = [1.118, 1.223, 1.052, 1.014, 0.912, 0.890, 0.881, 1.014, 0.960, 0.984, 0.918, 1.042]
 
     geracao_mensal = [dados["geracao_mensal"] * f for f in fator_sazonal_correto]
 
-    # Cores para Daltônicos (Alto Contraste)
     domain_ = ["Consumo (kWh)", "Geração Solar (kWh)"]
-    range_ = ["#FF4B4B", "#0068C9"]  # Vermelho e Azul
+    range_ = ["#FF4B4B", "#0068C9"]
 
-    if modo_grafico == "Mensal":
-        df = pd.DataFrame({
-            "Mês": meses,
-            "Consumo (kWh)": [R["consumo"]] * 12,
-            "Geração Solar (kWh)": geracao_mensal
-        }).melt("Mês", var_name="Categoria", value_name="Energia (kWh)")
+    df = pd.DataFrame({
+        "Mês": meses,
+        "Consumo (kWh)": [R["consumo"]] * 12,
+        "Geração Solar (kWh)": geracao_mensal
+    }).melt("Mês", var_name="Categoria", value_name="Energia (kWh)")
 
-        grafico = alt.Chart(df).mark_line(point=True).encode(
-            x=alt.X("Mês", sort=meses),
-            y=alt.Y("Energia (kWh)", title="Energia Mensal (kWh)"),
-            color=alt.Color("Categoria", scale=alt.Scale(domain=domain_, range=range_)),
-            tooltip=["Mês", "Categoria", "Energia (kWh)"]
-        ).properties(height=350, title="📊 Comparativo Mensal: Consumo x Geração Solar").interactive()
-    else:
-        df_anual = pd.DataFrame({
-            "Categoria": ["Consumo Anual", "Geração Solar Anual"],
-            "Energia (kWh/ano)": [R["consumo"] * 12, sum(geracao_mensal)]
-        })
-        # --- CORREÇÃO DO BUG DO GRÁFICO ANUAL ---
-        # Corrigido o `alt.Y` e o `tooltip` para usar o nome exato da coluna.
-        grafico = alt.Chart(df_anual).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
-            x="Categoria",
-            y=alt.Y("Energia (kWh/ano)", title="Energia Anual (kWh)"),
-            color=alt.Color("Categoria",
-                            scale=alt.Scale(domain=["Consumo Anual", "Geração Solar Anual"], range=range_)),
-            tooltip=["Categoria", "Energia (kWh/ano)"]
-        ).properties(height=350, title="📊 Comparativo Anual: Consumo x Geração Solar").interactive()
+    grafico = alt.Chart(df).mark_line(point=True).encode(
+        x=alt.X("Mês", sort=meses),
+        y=alt.Y("Energia (kWh)", title="Energia Mensal (kWh)"),
+        color=alt.Color("Categoria", scale=alt.Scale(domain=domain_, range=range_)),
+        tooltip=["Mês", "Categoria", "Energia (kWh)"]
+    ).properties(height=350, title="📊 Comparativo Mensal: Consumo x Geração Solar").interactive()
 
     st.altair_chart(grafico, use_container_width=True)
 
     st.info(
         "💡 **Dica:** A sua geração de energia pode ser maior que o seu consumo! Isso gera créditos de energia que podem ser usados em até 60 meses.")
 
-    # ----- Expanders de Informações Adicionais -----
     with st.expander("📘 Premissas e limitações da simulação"):
         st.markdown(f"""
         - *HSP (Horas de Sol Pleno):* média de *{R['hsp']}h/dia* para {R['cidade']}, baseada em dados do CRESESB/SWERA.    
@@ -442,6 +481,9 @@ if "res" in st.session_state:
         with col_video:
             st.video("https://www.youtube.com/watch?v=nKdq6BHBR0M")
 
+        # --- MUDANÇA: Citação da Fonte do Vídeo ---
+        st.caption("Fonte: Canal Engenharia 360 (YouTube)")
+
         st.markdown("---")
 
         st.markdown("#### Como funcionam as Tarifas (Ex: Enel)?")
@@ -454,7 +496,7 @@ if "res" in st.session_state:
 
             Para o cálculo da **economia** com energia solar, consideramos a soma dessas duas, pois o sistema fotovoltaico gera créditos que abatem ambas as faturas.
 
-            **Cuidado:** Você sempre pagará a **Taxa Mínima** (ou "custo de disponibilidade"), que é uma taxa para estar conectado à rede, mesmo que sua geração seja maior que o consumo. Nosso simulador não considera essa taxa mínima no cálculo da economia.
+            **Cuidado:** Você sempre pagará a **Taxa Mínima** (ou "custo de disponibilidade"), que é uma taxa para estar conectado à rede, mesmo que sua geração seja maior que o consumo. Nosso simulador agora calcula sua nova fatura com base nisso.
             """
         )
 
