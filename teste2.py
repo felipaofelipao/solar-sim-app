@@ -201,6 +201,9 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("2️⃣ Seus Dados")
     
+    # Variável para armazenar o texto de ajuda dinâmico
+    help_texto_tarifa = "" 
+    
     # Lógica condicional para consumo
     if modo_simulacao == "Com base na minha conta de luz (Já moro no local)":
         
@@ -215,6 +218,10 @@ with col1:
             ![Exemplo Conta de Luz](https://raw.githubusercontent.com/felipaofelipao/solar-sim-app/refs/heads/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_52053dd3.JPG)
             """
         )
+        
+        # MUDANÇA: Texto de ajuda para quem TEM conta
+        help_texto_tarifa = "Some todos os valores de 'Tarifa de Energia (TE)' e 'Tarifa de Uso (TUSD)' da sua conta. Use o botão '+' para adicionar quantos campos precisar."
+
     else:
         st.markdown("Preencha os dados da sua futura casa:")
         c_pessoas = st.number_input("Quantas pessoas vão morar?", min_value=1, value=3, step=1, key="c_pessoas")
@@ -226,23 +233,28 @@ with col1:
         consumo = estimar_consumo_casa_nova(c_pessoas, c_chuveiros, c_ar, c_freezer, c_home_office)
         st.info(f"Seu consumo estimado é de **{consumo} kWh/mês**.")
 
-    # --- CAMPO DE TARIFA ITERATIVO (COM CORREÇÃO DE BUG) ---
+        # MUDANÇA: Texto de ajuda para quem NÃO TEM conta
+        help_texto_tarifa = "Como você ainda não tem uma conta, usamos um valor padrão (R$ 0,85). Você pode pesquisar a tarifa residencial média da Enel Rio das Ostras e alterar este valor para uma simulação mais precisa."
+
+
+    # --- CAMPO DE TARIFA ITERATIVO (COM AJUDA DINÂMICA) ---
     st.markdown("**Tarifa de Energia (R$/kWh):**")
 
     # Loop para exibir os campos de tarifa existentes
     for i in range(len(st.session_state.tarifas_list)):
         
-        help_text_tarifa = None
+        help_tarifa_final = None
         if i == 0: # Adiciona o help SÓ no primeiro campo
-            help_text_tarifa = f"""
-            Some todos os valores de 'Tarifa de Energia (TE)' e 'Tarifa de Uso (TUSD)' da sua conta. Use o botão '+' para adicionar quantos campos precisar.
             
-            **Veja onde encontrar:**
+            # MUDANÇA: O texto de ajuda agora é dinâmico
+            help_tarifa_final = f"""
+            {help_texto_tarifa}
+            
+            **Exemplo de onde encontrar (se tiver conta):**
             
             ![Exemplo Conta de Luz](https://raw.githubusercontent.com/felipaofelipao/solar-sim-app/refs/heads/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_00537b91.JPG)
             """
         
-        # O widget atualiza o valor na lista. O valor padrão é pego da lista.
         st.session_state.tarifas_list[i] = st.number_input(
             f"Valor {i+1} (TE ou TUSD)", 
             min_value=0.00, 
@@ -251,15 +263,12 @@ with col1:
             step=0.01, 
             format="%.2f", 
             key=f"tarifa_input_{i}",
-            help=help_text_tarifa
+            help=help_tarifa_final # O 'help' agora é dinâmico
         )
     
-    # Botão para adicionar um novo campo de tarifa
     if st.button("Adicionar outro valor (+)", key="add_tarifa"):
         st.session_state.tarifas_list.append(0.0)
-        # --- CORREÇÃO DE BUG: Removido o st.rerun() ---
 
-    # Calcula e armazena a tarifa total
     tarifa_calculada = sum(st.session_state.tarifas_list)
     st.info(f"Sua Tarifa Total: **{formatar_reais(tarifa_calculada)} / kWh**")
 
@@ -501,3 +510,4 @@ if "res" in st.session_state:
         
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
