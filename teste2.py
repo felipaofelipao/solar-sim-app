@@ -10,8 +10,8 @@ AREA_PAINEL_M2 = 2.3
 FATOR_EMISSAO_CO2_KWH = 0.075
 
 # --- URLs DAS IMAGENS DE AJUDA (JÁ HOSPEDADAS) ---
-URL_AJUDA_CONSUMO = "https://raw.githubusercontent.com/felipaofelipao/solar-sim-app/refs/heads/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_00537b91.JPG"
-URL_AJUDA_TARIFA = "https://raw.githubusercontent.com/felipaofelipao/solar-sim-app/refs/heads/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_52053dd3.JPG"
+URL_AJUDA_CONSUMO = "https://raw.githubusercontent.com/felipaofelipao/solar-sim-app/refs/heads/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_52053dd3.JPG"
+URL_AJUDA_TARIFA = "https://raw.githubusercontent.com/felipaofelipao/solar-sim-app/refs/heads/main/Imagem%20do%20WhatsApp%20de%202025-11-09%20%C3%A0(s)%2017.36.05_00537b91.JPG"
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="SolarSim | Simulador Solar", page_icon="☀️", layout="wide")
@@ -544,3 +544,4 @@ if "res" in st.session_state:
         
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
