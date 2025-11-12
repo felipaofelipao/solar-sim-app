@@ -3,6 +3,10 @@ import pandas as pd
 import altair as alt
 import locale
 
+def adicionar_campo_tarifa():
+    """Callback para adicionar um novo campo de tarifa."""
+    st.session_state.tarifas_list.append(0.0)
+
 # --- CONSTANTES DE SIMULAÇÃO GLOBAIS ---
 TAXA_DESEMPENHO = 0.80
 POTENCIA_PAINEL_WP = 550
@@ -262,11 +266,15 @@ with col1:
                 help=help_tarifa_final
             )
 
-        if st.button("Adicionar outro valor (+)", key="add_tarifa"):
-            st.session_state.tarifas_list.append(0.0)
+       # Bloco Novo (COM A CORREÇÃO)
+    st.button(
+        "Adicionar outro valor (+)", 
+        key="add_tarifa",
+        on_click=adicionar_campo_tarifa  # Chama o callback
+    )
 
-        tarifa_calculada = sum(st.session_state.tarifas_list)
-        st.info(f"Sua Tarifa Total: **{formatar_reais(tarifa_calculada)} / kWh**")
+    tarifa_calculada = sum(st.session_state.tarifas_list)
+    st.info(f"Sua Tarifa Total: **{formatar_reais(tarifa_calculada)} / kWh**")
 
     else:  # --- MODO "ESTOU CONSTRUINDO" ---
         st.markdown("Preencha os dados da sua futura casa:")
@@ -545,3 +553,4 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
