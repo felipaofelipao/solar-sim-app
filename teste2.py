@@ -468,7 +468,7 @@ if "res" in st.session_state:
         st.metric(
             "Economia Mensal Bruta",
             formatar_reais(dados["economia_mensal_reais"]),
-            help="Este é o valor máximo que você pode economizar na tarifa, com base na sua geração e consumo. Sua 'Nova Fatura' considera a taxa mínima obrigatória."
+            #help="Este é o valor máximo que você pode economizar na tarifa, com base na sua geração e consumo. Sua 'Nova Fatura' considera a taxa mínima obrigatória."
         )
 
         saldo_kwh = R["saldo_kwh"]
@@ -584,3 +584,4 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
