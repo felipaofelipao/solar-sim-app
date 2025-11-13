@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import locale
+import math
 
 # --- CONSTANTES DE SIMULAÇÃO GLOBAIS ---
 TAXA_DESEMPENHO = 0.80
@@ -78,7 +79,7 @@ def calcular_sistema_solar(consumo_kwh, tarifa, hsp, custo_wp_regional):
     potencia_necessaria_kwp = consumo_diario_kwh / (hsp * TAXA_DESEMPENHO)
     potencia_necessaria_wp = potencia_necessaria_kwp * 1000
 
-    numero_paineis = max(1, round(potencia_necessaria_wp / POTENCIA_PAINEL_WP))
+    numero_paineis = max(1, math.ceil(potencia_necessaria_wp / POTENCIA_PAINEL_WP))
     potencia_final_sistema_wp = numero_paineis * POTENCIA_PAINEL_WP
     potencia_kwp_final = potencia_final_sistema_wp / 1000
     area_total_m2 = numero_paineis * AREA_PAINEL_M2
@@ -117,7 +118,7 @@ def calcular_sistema_por_orcamento(orcamento, custo_wp_regional, consumo_kwh, ta
     potencia_final_sistema_wp = orcamento / custo_wp_regional
     potencia_kwp_final = potencia_final_sistema_wp / 1000
     inversor_kw_rec = potencia_kwp_final / 1.25
-    numero_paineis = max(1, round(potencia_final_sistema_wp / POTENCIA_PAINEL_WP))
+    numero_paineis = max(1, math.ceil(potencia_final_sistema_wp / POTENCIA_PAINEL_WP))
     area_total_m2 = numero_paineis * AREA_PAINEL_M2
 
     geracao_diaria_kwh = potencia_kwp_final * hsp * TAXA_DESEMPENHO
@@ -584,5 +585,6 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
 
 
