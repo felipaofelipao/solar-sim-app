@@ -459,7 +459,7 @@ if "res" in st.session_state:
         st.metric(
             "Inversor Recomendado (Tamanho CA)",
             f"~ {dados['inversor_kw_recomendado']} kW",
-            help="Este é o tamanho nominal (em CA) do inversor, considerando um 'oversizing' padrão de 125% da potência dos painéis (em CC)."
+            #help="Este é o tamanho nominal (em CA) do inversor, considerando um 'oversizing' padrão de 125% da potência dos painéis (em CC)."
         )
         st.metric("Quantidade de Painéis", f"{dados['numero_paineis']}")
         st.metric("Área Mínima Necessária", f"{dados['area_m2']} m²")
@@ -468,7 +468,7 @@ if "res" in st.session_state:
         st.metric(
             "Economia Mensal Bruta",
             formatar_reais(dados["economia_mensal_reais"]),
-            #help="Este é o valor máximo que você pode economizar na tarifa, com base na sua geração e consumo. Sua 'Nova Fatura' considera a taxa mínima obrigatória."
+            help="Este é o valor máximo que você pode economizar na tarifa, com base na sua geração e consumo. Sua 'Nova Fatura' considera a taxa mínima obrigatória."
         )
 
         saldo_kwh = R["saldo_kwh"]
@@ -543,8 +543,8 @@ if "res" in st.session_state:
         - *Taxa de Desempenho (PR):* {int(TAXA_DESEMPENHO * 100)}%.    
         - *Custo médio do Wp instalado na região:* **{formatar_reais(CUSTO_WP_CAPITAIS[R['cidade']])}/Wp**.    
         - *Economia Mensal:* calculada sobre a tarifa cheia informada (não considera taxa mínima da distribuidora).    
-        - *Variação sazonal:* padrão médio de irradiação no Brasil.    
-        - *Emissão de CO₂ evitada:* fator médio do SIN.
+        - *Variação sazonal:* Irradiação média varia conforme a mudança climática.  
+        - *Emissão de CO₂ evitada:* fator médio do Sistema Interligado Nacional.
         - **Cabos e Proteções:** O dimensionamento de cabos (bitola) e disjuntores **NÃO** está incluído. Isso deve ser feito por um engenheiro eletricista qualificado durante a visita técnica, pois depende da distância e das condições específicas da sua residência.
         """)
 
@@ -584,4 +584,5 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
 
