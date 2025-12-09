@@ -247,7 +247,7 @@ with col1:
         consumo = st.number_input(
             "Consumo médio mensal (kWh):",
             min_value=50, max_value=10000, value=300, step=10, key="consumo",
-            help=f"Abra sua conta de luz e procure pelo 'Total Consumo Mês'.\n\n![Exemplo]({URL_AJUDA_CONSUMO})"
+            help=f"Abra sua conta de luz e procure pelo 'Total Consumo Mês'.\n\n![Exemplo]({URL_AJUDA_TARIFA})"
         )
 
         help_texto_tarifa = "Some todos os valores de 'Tarifa de Energia (TE)' e 'Tarifa de Uso (TUSD)' da sua conta."
@@ -256,7 +256,7 @@ with col1:
         for i in range(len(st.session_state.tarifas_list)):
             help_tarifa_final = None
             if i == 0:
-                help_tarifa_final = f"{help_texto_tarifa}\n\n**Exemplo:**\n\n![Exemplo]({URL_AJUDA_TARIFA})"
+                help_tarifa_final = f"{help_texto_tarifa}\n\n**Exemplo:**\n\n![Exemplo]({URL_AJUDA_CONSUMO})"
 
             st.session_state.tarifas_list[i] = st.number_input(
                 f"Valor {i + 1} (TE ou TUSD)",
@@ -561,3 +561,4 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
