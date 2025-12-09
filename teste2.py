@@ -42,7 +42,7 @@ CSS_APP_STYLE = """
     div[data-testid="stMetric"] div[data-testid="stMetricValue"] { 
         font-size: 4.0rem !important; 
         font-weight: 800 !important;
-        color: #0000FF !important; 
+        color: #00ffff !important; 
         line-height: 1.1 !important;
     }
 
@@ -561,5 +561,6 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
 
 
