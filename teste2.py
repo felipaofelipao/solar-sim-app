@@ -343,22 +343,17 @@ with col_val:
         custo_final = resultados_tmp["custo_total_estimado_site"]
 
 # 3) Botão Calcular
+    
 if st.button("⚡ Simular meu sistema solar", type="primary", use_container_width=True):
     
-    # --- ROLAGEM AUTOMÁTICA (TENTATIVA FINAL - SELETOR ESPECÍFICO) ---
-    components.html(
-        """
-        <script>
-            // Procura especificamente o container de rolagem do Streamlit
-            var main_container = window.parent.document.querySelector('section[data-testid="stAppViewContainer"]');
-            if (main_container) {
-                // Força a rolagem para o fundo desse container
-                main_container.scrollTop = main_container.scrollHeight;
-            }
-        </script>
-        """,
-        height=0
-    )
+    # --- NOTIFICAÇÃO VISUAL (Substituindo o Scroll) ---
+    # Mensagem flutuante no canto da tela
+    st.toast("✅ Cálculos finalizados! Role para baixo para ver.", icon="👇")
+    
+    # Mensagem fixa logo abaixo do botão
+    st.success("✅ **Simulação pronta!** Role a página para baixo para ver seus resultados. 👇")
+
+    # (O código continua normalmente aqui: if st.session_state.modo_simulacao == ...)
 
     if st.session_state.modo_simulacao == "Com base na minha conta de luz (Já moro no local)":
         consumo_atual = st.session_state.consumo
@@ -561,6 +556,7 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
 
 
 
