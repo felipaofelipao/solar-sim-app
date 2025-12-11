@@ -344,22 +344,21 @@ with col_val:
 
 # 3) Botão Calcular
 if st.button("⚡ Simular meu sistema solar", type="primary", use_container_width=True):
-
-    # --- ROLAGEM AUTOMÁTICA (MÉTODO ALTERNATIVO ROBUSTO) ---
-    # Rola a página para o rodapé (footer) que é um ponto seguro
-    js_scroll = """
+    
+    # --- ROLAGEM AUTOMÁTICA (TENTATIVA FINAL - SELETOR ESPECÍFICO) ---
+    components.html(
+        """
         <script>
-            setTimeout(function() {
-                // Seleciona o container principal de rolagem do Streamlit
-                var scroller = window.parent.document.querySelector('section.main');
-                if (scroller) {
-                    // Força a barra de rolagem para o valor máximo de altura (fim da página)
-                    scroller.scrollTop = scroller.scrollHeight;
-                }
-            }, 2000); // Aguarda 1 segundo inteiro para garantir que os resultados apareceram
+            // Procura especificamente o container de rolagem do Streamlit
+            var main_container = window.parent.document.querySelector('section[data-testid="stAppViewContainer"]');
+            if (main_container) {
+                // Força a rolagem para o fundo desse container
+                main_container.scrollTop = main_container.scrollHeight;
+            }
         </script>
-    """
-    components.html(js_scroll, height=0)
+        """,
+        height=0
+    )
 
     if st.session_state.modo_simulacao == "Com base na minha conta de luz (Já moro no local)":
         consumo_atual = st.session_state.consumo
@@ -562,6 +561,7 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
 
 
 
