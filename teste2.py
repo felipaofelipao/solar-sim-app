@@ -356,7 +356,7 @@ if st.button("⚡ Simular meu sistema solar", type="primary", use_container_widt
                     // Força a barra de rolagem para o valor máximo de altura (fim da página)
                     scroller.scrollTop = scroller.scrollHeight;
                 }
-            }, 500); // Aguarda 1 segundo inteiro para garantir que os resultados apareceram
+            }, 2000); // Aguarda 1 segundo inteiro para garantir que os resultados apareceram
         </script>
     """
     components.html(js_scroll, height=0)
@@ -562,6 +562,7 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
 
 
 
