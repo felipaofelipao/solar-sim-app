@@ -349,13 +349,14 @@ if st.button("⚡ Simular meu sistema solar", type="primary", use_container_widt
     # Rola a página para o rodapé (footer) que é um ponto seguro
     js_scroll = """
         <script>
-            var body = window.parent.document.querySelector(".main");
-            var footer = window.parent.document.querySelector("footer");
-            if (footer) {
-                footer.scrollIntoView({behavior: "smooth", block: "end"});
-            } else {
-                body.scrollTop = body.scrollHeight;
-            }
+            setTimeout(function() {
+                // Seleciona o container principal de rolagem do Streamlit
+                var scroller = window.parent.document.querySelector('section.main');
+                if (scroller) {
+                    // Força a barra de rolagem para o valor máximo de altura (fim da página)
+                    scroller.scrollTop = scroller.scrollHeight;
+                }
+            }, 1000); // Aguarda 1 segundo inteiro para garantir que os resultados apareceram
         </script>
     """
     components.html(js_scroll, height=0)
@@ -561,6 +562,7 @@ if "res" in st.session_state:
 
         st.markdown("*Sustentabilidade:*")
         st.markdown("- [**ABSOLAR** — dados e impacto do setor](https://www.absolar.org.br/)")
+
 
 
 
